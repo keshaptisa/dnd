@@ -18,7 +18,7 @@ NAME, CLASSES, RACE, BACKGROUND = range(4)
 
 # Функция старта
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.message.reply_text("Приветствую, Путник! Давай создадим твою анкету для D&D. Как тебя зовут?")
+    await update.message.reply_text("Приветствую в таверне, Путник! Давай создадим твою анкету для D&D. Как тебя зовут?")
     return NAME
 
 
