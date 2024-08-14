@@ -103,7 +103,6 @@ def save_to_csv(data, filename):
     """Сохраняет данные в CSV файл."""
     with open(filename, mode='w', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
-        writer.writerow(['Name', 'Classes', 'Race', 'Background'])  # Заголовки
         writer.writerow([data['name'], data['classes'], data['race'], data['background']])
 
 
