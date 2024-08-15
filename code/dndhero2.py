@@ -18,14 +18,16 @@ NAME, CLASSES, RACE, BACKGROUND = range(4)
 
 # Функция старта
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.message.reply_text("Приветствую в таверне, Путник! Давай создадим твою анкету для D&D. Как тебя зовут?")
+    await update.message.reply_text("Приветствую тебя в таерне, Путник! Перед началом нового путешествия придется"
+                                    "заполнить небольшую анкету. Так-с... Как тебя зовут?")
     return NAME
 
 
 # Получаем имя
 async def get_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['name'] = update.message.text
-    await update.message.reply_text("Замечательно, " + update.message.text + "! Выбери класс своего персонажа!")
+    await update.message.reply_text("Приятно познакомиться, " + update.message.text + "! Теперь выбери класс своего "
+                                                                                      "персонажа!")
     await show_class_menu(update)
     return CLASSES
 
@@ -33,10 +35,22 @@ async def get_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 # Показываем меню выбора класса
 async def show_class_menu(update: Update) -> None:
     keyboard = [
-        [InlineKeyboardButton("Маг", callback_data='mag')],
-        [InlineKeyboardButton("Воин", callback_data='voin')],
-        [InlineKeyboardButton("Друид", callback_data='druid')],
-        [InlineKeyboardButton("Жрец", callback_data='zrec')],
+        [InlineKeyboardButton("'Бард' Сила: 8 Ловкость: 14 Телосложение: 12 Интеллект: 13 Мудрость: 10 Харизма: 15",
+                              callback_data='bard, 8, 14, 12, 13, 10, 15')],
+        [InlineKeyboardButton("'Варвар' Сила: 15 Ловкость: 13 Телосложение: 14 Интеллект: 8 Мудрость: 10 Харизма: 12",
+                              callback_data='varvar, 15, 13, 14, 8, 10, 12')],
+        [InlineKeyboardButton("'Воин' Сила: 15 Ловкость: 14 Телосложение: 13 Интеллект: 10 Мудрость: 8 Харизма: 12",
+                              callback_data='voin, 15, 14, 13, 10, 8, 12')],
+        [InlineKeyboardButton("'Волшебник' Сила: 8 Ловкость: 13 Телосложение: 10 Интеллект: 15 Мудрость: 14 Харизма: 12",
+                              callback_data='volshebnic, 8, 13, 10, 15, 14, 12')],
+        [InlineKeyboardButton("'Друид' Сила: 10 Ловкость: 12 Телосложение: 13 Интеллект: 14 Мудрость: 15 Харизма: 8",
+                              callback_data='druid, 10, 12, 13, 14, 15, 8')],
+        [InlineKeyboardButton("'Жрец' Сила: 10 Ловкость: 14 Телосложение: 8 Интеллект: 13 Мудрость: 15 Харизма: 12",
+                              callback_data='zrec, 10, 14, 8, 13, 15, 12')],
+        [InlineKeyboardButton("'Изобретатель' Сила: 13 Ловкость: 14 Телосложение: 12 Интеллект: 15 Мудрость: 8 Харизма: 10",
+                              callback_data='izobret, 13, 14, 12, 15, 8, 10')],
+        [InlineKeyboardButton("'Паладин' Сила: 15 Ловкость: 8 Телосложение: 13 Интеллект: 10 Мудрость: 12 Харизма: 14",
+                              callback_data='paladin, 15, 8, 13, 10, 12, 14')],
         [InlineKeyboardButton("Отмена", callback_data='cancel')]
     ]
 
@@ -52,7 +66,8 @@ async def get_class(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     selected_class = query.data
     context.user_data['classes'] = selected_class
 
-    await query.message.reply_text(f"Вы выбрали класс: {selected_class}. Теперь выберите расу.")
+    await query.message.reply_text(f"Так я сразу и подумал, по тебе видно, что ты знаток своего дела! "
+                                   f"Теперь укажи расу персонажа")
     await show_race_menu(query)
     return RACE
 
@@ -60,10 +75,14 @@ async def get_class(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 # Отображаем меню выбора расы
 async def show_race_menu(query) -> None:
     keyboard = [
-        [InlineKeyboardButton("Человек", callback_data='human')],
-        [InlineKeyboardButton("Эльф", callback_data='elf')],
-        [InlineKeyboardButton("Дворф", callback_data='dwarf')],
-        [InlineKeyboardButton("Хоббит", callback_data='hobbit')],
+        [InlineKeyboardButton("'Человек' все характеристики +1", callback_data='human, 1, 1, 1, 1, 1, 1')],
+        [InlineKeyboardButton("'Эльф' ловкость +2", callback_data='elf, 0, 2, 0, 0, 0, 0')],
+        [InlineKeyboardButton("'Дварф' сила +2", callback_data='dwarf, 2, 0, 0, 0, 0, 0')],
+        [InlineKeyboardButton("'Гном' интеллект +2", callback_data='gnom, 0, 0, 0, 2, 0, 0')],
+        [InlineKeyboardButton("'Гоблин' ловкость +2", callback_data='goblin, 0, 2, 0, 0, 0, 0')],
+        [InlineKeyboardButton("'Полурослик' ловкость +2", callback_data='maxim, 0, 2, 0, 0, 0, 0')],
+        [InlineKeyboardButton("'Кенку' мудрость +2", callback_data='kenku, 0, 0, 0, 0, 2, 0')],
+        [InlineKeyboardButton("'Вампир' сила +2", callback_data='vimpire, 2, 0, 0, 0, 0, 0')],
         [InlineKeyboardButton("Отмена", callback_data='cancel')]
     ]
 
@@ -77,7 +96,8 @@ async def choose_race(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     await query.answer()
     race = query.data
     context.user_data['race'] = race
-    await query.message.reply_text(f"Вы выбрали расу: {race}. Какая предыcтория вашего персонажа?")
+    await query.message.reply_text(f"А теперь поведаешь ли мне, чем ты занимался до того, "
+                                   f"как забрёл в мою таверну?")
     return BACKGROUND
 
 
