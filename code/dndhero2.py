@@ -1,3 +1,4 @@
+# Импортируем библиотеки
 import csv
 import logging
 import requests
