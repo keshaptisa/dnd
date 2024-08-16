@@ -3,7 +3,8 @@ import csv
 import logging
 import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ConversationHandler, ContextTypes,CallbackQueryHandler, CallbackContext
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ConversationHandler, ContextTypes, \
+    CallbackQueryHandler, CallbackContext
 from datetime import datetime
 import venv
 import os
@@ -41,14 +42,16 @@ async def show_class_menu(update: Update) -> None:
                               callback_data='varvar, 15, 13, 14, 8, 10, 12')],
         [InlineKeyboardButton("'Воин' Сила: 15 Ловкость: 14 Телосложение: 13 Интеллект: 10 Мудрость: 8 Харизма: 12",
                               callback_data='voin, 15, 14, 13, 10, 8, 12')],
-        [InlineKeyboardButton("'Волшебник' Сила: 8 Ловкость: 13 Телосложение: 10 Интеллект: 15 Мудрость: 14 Харизма: 12",
-                              callback_data='volshebnic, 8, 13, 10, 15, 14, 12')],
+        [InlineKeyboardButton(
+            "'Волшебник' Сила: 8 Ловкость: 13 Телосложение: 10 Интеллект: 15 Мудрость: 14 Харизма: 12",
+            callback_data='volshebnic, 8, 13, 10, 15, 14, 12')],
         [InlineKeyboardButton("'Друид' Сила: 10 Ловкость: 12 Телосложение: 13 Интеллект: 14 Мудрость: 15 Харизма: 8",
                               callback_data='druid, 10, 12, 13, 14, 15, 8')],
         [InlineKeyboardButton("'Жрец' Сила: 10 Ловкость: 14 Телосложение: 8 Интеллект: 13 Мудрость: 15 Харизма: 12",
                               callback_data='zrec, 10, 14, 8, 13, 15, 12')],
-        [InlineKeyboardButton("'Изобретатель' Сила: 13 Ловкость: 14 Телосложение: 12 Интеллект: 15 Мудрость: 8 Харизма: 10",
-                              callback_data='izobret, 13, 14, 12, 15, 8, 10')],
+        [InlineKeyboardButton(
+            "'Изобретатель' Сила: 13 Ловкость: 14 Телосложение: 12 Интеллект: 15 Мудрость: 8 Харизма: 10",
+            callback_data='izobret, 13, 14, 12, 15, 8, 10')],
         [InlineKeyboardButton("'Паладин' Сила: 15 Ловкость: 8 Телосложение: 13 Интеллект: 10 Мудрость: 12 Харизма: 14",
                               callback_data='paladin, 15, 8, 13, 10, 12, 14')],
         [InlineKeyboardButton("Отмена", callback_data='cancel')]
@@ -97,41 +100,53 @@ async def choose_race(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     selected_race = query.data.split(', ')
     context.user_data['race'] = selected_race[0]
     race_attributes = list(map(int, selected_race[1:]))
-    
+    global final_attributes
     # Сохраняем итоговые характеристики
-    final_attributes = [class_attr + race_attr for class_attr, race_attr in zip(context.user_data['class_attributes'], race_attributes)]
+    final_attributes = [class_attr + race_attr for class_attr, race_attr in
+                        zip(context.user_data['class_attributes'], race_attributes)]
 
     # Сохраняем данные в CSV
-    save_character_to_csv(context.user_data['name'], context.user_data['race'], context.user_data['class'], final_attributes)
+
     await query.message.reply_text(f"А теперь поведаешь ли мне, чем ты занимался до того, "
                                    f"как забрёл в мою таверну?")
     return BACKGROUND
 
 
-# Получаем историю и сохраняем данные
 async def get_background(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['background'] = update.message.text
-    filename = f"{context.user_data['name']}_character_data.csv"
 
+    # Извлекаем необходимые данные
+    name = context.user_data.get('name')
+    race = context.user_data.get('race')
+    character_class = context.user_data.get('character_class')
+    attributes = context.user_data.get('attributes', [])
+
+    # print(
+    #     f"Before saving: name={name}, race={race}, character_class={character_class}, attributes={attributes}")  # Отладочная информация
+
+    filename = f"{name}_character_data.csv"
+    save_character_to_csv(context.user_data['name'], context.user_data['race'], context.user_data['class'],
+                          final_attributes, filename)
     # Сохраняем данные в CSV файл
-    save_to_csv(context.user_data, filename)
+    # save_character_to_csv(name, race, character_class, attributes, filename)
 
     # Отправляем файл пользователю
     with open(filename, 'rb') as file:
         await update.message.reply_document(document=file)
 
-    # Удаляем файл после отправки (по желанию)
     os.remove(filename)
 
-    return -1  # Завершение разговора или другое состояние
+    return -1
 
-def save_to_csv(data, filename='characters.csv'):
+
+# Получаем историю и сохраняем данные
+def save_character_to_csv(name, race, character_class, attributes, filename='characters.csv'):
     """Сохраняет данные о персонаже в CSV файл."""
+    print(f"Saving character: {name}, {race}, {character_class}, {attributes}")  # Отладочная информация
     with open(filename, mode='a', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
-
         # Записываем данные персонажа
-        writer.writerow([data['name'], data['race'], data['classes']] + data['attributes'])
+        writer.writerow([name, race, character_class] + attributes)
 
 
 # Завершение разговора
@@ -159,6 +174,7 @@ def main():
 
     # Запустите бота
     application.run_polling()
+
 
 if __name__ == '__main__':
     main()
