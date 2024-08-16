@@ -1,18 +1,13 @@
 import logging
 import csv
 import requests
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes, CallbackContext
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, CallbackContext
 import random
 from telegram import Update
 from telegram.ext import ContextTypes
 import json
 import aiohttp
-import openai
 from gtts import gTTS
-import os
-import asyncio
-import wave
-from vosk import Model, KaldiRecognizer
 
 
 # Включаем логирование
@@ -24,7 +19,8 @@ UPLOAD, STORY, PLAYER_ACTION = range(3)
 
 # Хранение данных игроков
 current_player_index = 0  # Индекс текущего игрока
-players_data = {}
+players_data = []
+playa = []
 player_rolls = {}
 STORY_FILE = 'story.json'  # Файл для хранения истории
 
@@ -90,9 +86,10 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):  
         reader = csv.reader(csvfile, delimiter=',') #если файл считывает не только имя поменяй delimiter на ',' или ';'
         for row in reader:
             player_name = row[0]  #первый столбец имя
+            c = Character(player_name, row[3], row[4], row[5], row[6], row[7], row[8])
             await update.message.reply_text(player_name)  #добавляем персонажа в очередь
             player_rolls[player_name] = 0  #присваиваем результаты бросков
-    print(player_rolls)
+    playa.append(c)
     await update.message.reply_text("Данные успешно загружены! Используйте /roll для броска кубика.")
 
 
@@ -108,7 +105,7 @@ async def order_roll(update: Update, context: ContextTypes.DEFAULT_TYPE): #ку�
     player_rolls[player_name] = roll_result  #присваиваем результат
     await update.message.reply_text(f"{player_name}, вы бросили кубик и получили: {roll_result}")
     #спросить у пользователя хочет ли он начать игру или добавить персонажей
-    await update.message.reply_text("Хотите начать игру или добавить еще персонажей? Скиньте файл если хотите добавить еще персонажей или напишите /start_game если хотите начать'.")
+    await update.message.reply_text("Хотите начать игру или добавить еще персонажей? Скиньте файл если хотите добавить еще персонажей или напишите /start_game если хотите начать.")
     await show_order(update, context)
 
 
@@ -116,8 +113,15 @@ async def show_order(update: Update, context: ContextTypes.DEFAULT_TYPE): #по�
     if not player_rolls:
         await update.message.reply_text("Нет зарегистрированных игроков.")
         return
-    global sorted_players
+    global sorted_players, playa
     sorted_players = sorted(player_rolls.items(), key=lambda x: x[1], reverse=True)
+    pp = []
+    for x in sorted_players:
+        for ch in playa:
+            if ch.name == x[0]:
+                pp.append(ch)
+    playa = pp.copy()
+
     order_message = "Очередность участников:\n"
     for i, (player, roll) in enumerate(sorted_players, start=1):
         order_message += f"{i}. {player} - {roll}\n"
@@ -127,7 +131,7 @@ async def show_order(update: Update, context: ContextTypes.DEFAULT_TYPE): #по�
 async def ask_gpt(prompt):  #запрос в гпт
     headers = {
         #апи ключ и формат в котором приходит ответ
-        'Authorization': f'Bearer sk-EEbaLASG4MCcyhXgkHFkfUSwt96qN2QWMybGbyDxHbT3BlbkFJv6XUPYAFTmmemvc3qYxXZTB08a32ItgLERPbhyWeEA',
+        'Authorization': f'Bearer sk-M6nTKyYUrj_wB7u8VCZMAb4kP6ErJ0s8sxlh9Iu4xQT3BlbkFJ-MHp0LwkJT11Fbfteppyy2B3lRX4x9NfMD20bjT-cA',
         'Content-Type': 'application/json',
     }
 
@@ -146,24 +150,15 @@ async def ask_gpt(prompt):  #запрос в гпт
                 return f"Ошибка: {response.status}, {await response.text()}"  #скорее всего не включен впн
 
 
-def text_to_speech(text):  #озвучка текста от гпт но нема выбора голоса
+def text_to_speech(text):
     tts = gTTS(text=text, lang='ru')
     tts.save("output.mp3")
-    os.system("start output.mp3")
-# в этой есть нужный но хз работает или нет
-#
-# response = openai.ChatCompletion.create(
-#     model="tts-1",
-#     voice="Onyx",
-#     input=response['choices'][0]['message']['content'],
-# )
-#
-# response.stream_to_file("output.mp3")
+    return "output.mp3"
 
 
 async def generate_image(prompt):  #генерим пикчи по тексту от гпт
     headers = {
-        'Authorization': f'Bearer "sk-EEbaLASG4MCcyhXgkHFkfUSwt96qN2QWMybGbyDxHbT3BlbkFJv6XUPYAFTmmemvc3qYxXZTB08a32ItgLERPbhyWeEA',
+        'Authorization': f'Bearer "sk-M6nTKyYUrj_wB7u8VCZMAb4kP6ErJ0s8sxlh9Iu4xQT3BlbkFJ-MHp0LwkJT11Fbfteppyy2B3lRX4x9NfMD20bjT-cA',
         'Content-Type': 'application/json',
     }
 
@@ -189,34 +184,24 @@ async def start_game(update: Update, context: CallbackContext):  #начало �
     current_player_index = 0  # Сброс индекса игроков
     with open(STORY_FILE, 'w') as f:
         json.dump({"story": story_start}, f)
-
-    #генерация аудио и изображения параллельно
-    audio_task = asyncio.create_task(text_to_speech(story_start))
-    image_task = asyncio.create_task(generate_image(story_start))
-
-    #ожидание завершения задач
-    audio_file_path = await audio_task
-    image_url = await image_task
-
-    #отправка изображения и аудио пользователю
-    await update.message.reply_photo(photo=image_url)
     if context.user_data['message_format'] == 'text':
         await update.message.reply_text(story_start)
     else:
+        audio_file_path = text_to_speech(story_start)
         await context.bot.send_audio(chat_id=update.effective_chat.id, audio=open(audio_file_path, 'rb'))
-    await update.message.reply_text("Игра началась! Введите ваши действия с помощью команды /action.")
+    await update.message.reply_text("Игра началась! Введите ваши действия после команды /action.\nНапример так: '/action взять стакан'")
 
 
 class Character:  #характеристки для проверки
-    def __init__(self, name):
+    def __init__(self, name, p1, p2, p3, p4, p5, p6):
         self.name = name
         self.attributes = {
-            'сила': random.randint(1, 20),
-            'ловкость': random.randint(1, 20),
-            'телесложение': random.randint(1, 20),
-            'интеллект': random.randint(1, 20),
-            'мудрость': random.randint(1, 20),
-            'харизма': random.randint(1, 20)
+            'сила': int(p1),
+            'ловкость': int(p2),
+            'телесложение': int(p3),
+            'интеллект': int(p4),
+            'мудрость': int(p5),
+            'харизма': int(p6)
         }
 
 
@@ -224,7 +209,8 @@ def roll_d20():  #кубик
     return random.randint(1, 20)
 
 
-async def perform_action(character: Character, action: str, update: Update):  #ответ на действие героя
+async def perform_action(action: str, update: Update):  #ответ на действие героя
+    character = playa[current_player_index]
     attribute = random.choice(list(character.attributes.keys()))  #выбираем рандом характеристику но по хорошему надо отдельно у гпт спрашивать какую характеристику данное действие использует
     threshold = random.randint(1, 20)  #также рандом но по хорошему через гпт
     roll = roll_d20()  #кидаем кубик
@@ -235,14 +221,7 @@ async def perform_action(character: Character, action: str, update: Update):  #�
              f"Необходимая характеристика: {attribute}, Порог: {threshold}. " \
              f"Успех: {'да' if success else 'нет'}. Опиши, что происходит дальше."
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=[
-            {"role": "user", "content": prompt}
-        ]
-    )
-
-    gpt_response = response['choices'][0]['message']['content']
+    gpt_response = await ask_gpt(prompt)
     await update.message.reply_text(gpt_response)
 
 
@@ -251,47 +230,10 @@ async def perform_action(character: Character, action: str, update: Update):  #�
 
 async def action(update: Update, context: ContextTypes.DEFAULT_TYPE):   #эту хуету писала гпт вообще не факт что работает но расскажу как должна
     global current_player_index
+    await show_order(update, context)
+    action_text = ' '.join(context.args) if context.args else "действие"
 
-    character = sorted_players[current_player_index] #с нулевого пользователя идем по списку с очередность героев
-
-    if update.message.text: #тут смотрим ответ по действию пришел в тексе или гс
-        # Обработка текстового сообщения
-        action_text = ' '.join(context.args) if context.args else "действие"
-    elif update.message.audio:
-        # Обработка аудио сообщения
-        audio_file = await context.bot.get_file(update.message.audio.file_id)
-        audio_path = f"{audio_file.file_id}.ogg"  #сохранение файла
-        await audio_file.download(audio_path)
-
-        #конвертация OGG в WAV (если необходимо)
-        os.system(f"ffmpeg -i {audio_path} {audio_path.replace('.ogg', '.wav')}")
-
-        #распознавание речи из аудио
-        wf = wave.open(audio_path.replace('.ogg', '.wav'), "rb")
-        rec = KaldiRecognizer(model, wf.getframerate())
-
-        action_text = ""
-        while True:
-            data = wf.readframes(4000)
-            if len(data) == 0:
-                break
-            if rec.AcceptWaveform(data):
-                action_text = rec.Result()
-            else:
-                rec.PartialResult()
-                #если эта хуйня не работает то вот еще вариант но надо ввести путь и куда потом этот текст
-                # from openai import OpenAI
-                # client = OpenAI()
-                #
-                # audio_file = open("/path/to/file/audio.mp3", "rb")
-                # transcription = client.audio.transcriptions.create(
-                #     model="whisper-1",
-                #     file=audio_file
-                # )
-                # print(transcription.text)
-        action_text = json.loads(action_text).get('text', "Не удалось распознать аудио.")
-
-    await perform_action(character, action_text, update) #обращаемся к функции которая дает нам необходимый результат и лстальную хуету
+    await perform_action(action_text, update) #обращаемся к функции которая дает нам необходимый результат и лстальную хуету
 
     current_player_index += 1 #переходим на следующего героя в очереди
 
@@ -299,23 +241,17 @@ async def action(update: Update, context: ContextTypes.DEFAULT_TYPE):   #эту 
         current_player_index = 0  #сброс индекса для следующего раунда
         await continue_story(update)  #вызов функции продолжения истории
     else:
-        next_character = sorted_players[current_player_index]
-        await update.message.reply_text(f"Теперь ход {next_character.name}. Введите ваше действие или отправьте аудио:")
+        next_character = playa[current_player_index]
+        await update.message.reply_text(f"Теперь ход {next_character.name}. Введите ваше действие:")
 
 
 async def continue_story(update: Update):  #после круга действий приходим сюда после чего снова идут дейсвтия
     #продолжения истории
     prompt = "Продолжи историю и подведи игроков к появлению врага."
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=[
-            {"role": "user", "content": prompt}
-        ]
-    )
-
-    gpt_response = response['choices'][0]['message']['content']
+    gpt_response = await ask_gpt(prompt)
     await update.message.reply_text(gpt_response)
+    await show_order(update)
     await action(update)  #вызов функции приема дейсвий
 
 
