@@ -64,7 +64,7 @@ async def get_class(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await query.answer()
     selected_class = query.data.split(', ')
     context.user_data['class'] = selected_class[0]
-    context.user_data['class_attributes'] = list(map(int, selected_class[1:])
+    context.user_data['class_attributes'] = list(map(int, selected_class[1:]))
 
     await query.message.reply_text(f"Так я сразу и подумал, по тебе видно, что ты знаток своего дела! "
                                    f"Теперь укажи расу персонажа")
