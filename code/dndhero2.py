@@ -62,9 +62,9 @@ async def show_class_menu(update: Update) -> None:
 async def get_class(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
-
-    selected_class = query.data
-    context.user_data['classes'] = selected_class
+    selected_class = query.data.split(', ')
+    context.user_data['class'] = selected_class[0]
+    context.user_data['class_attributes'] = list(map(int, selected_class[1:])
 
     await query.message.reply_text(f"Так я сразу и подумал, по тебе видно, что ты знаток своего дела! "
                                    f"Теперь укажи расу персонажа")
@@ -94,8 +94,15 @@ async def show_race_menu(query) -> None:
 async def choose_race(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
-    race = query.data
-    context.user_data['race'] = race
+    selected_race = query.data.split(', ')
+    context.user_data['race'] = selected_race[0]
+    race_attributes = list(map(int, selected_race[1:]))
+    
+    # Сохраняем итоговые характеристики
+    final_attributes = [class_attr + race_attr for class_attr, race_attr in zip(context.user_data['class_attributes'], race_attributes)]
+
+    # Сохраняем данные в CSV
+    save_character_to_csv(context.user_data['name'], context.user_data['race'], context.user_data['class'], final_attributes)
     await query.message.reply_text(f"А теперь поведаешь ли мне, чем ты занимался до того, "
                                    f"как забрёл в мою таверну?")
     return BACKGROUND
@@ -118,12 +125,13 @@ async def get_background(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     return -1  # Завершение разговора или другое состояние
 
-
-def save_to_csv(data, filename):
-    """Сохраняет данные в CSV файл."""
-    with open(filename, mode='w', newline='', encoding='utf-8') as file:
+def save_to_csv(data, filename='characters.csv'):
+    """Сохраняет данные о персонаже в CSV файл."""
+    with open(filename, mode='a', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
-        writer.writerow([data['name'], data['classes'], data['race'], data['background']])
+
+        # Записываем данные персонажа
+        writer.writerow([data['name'], data['race'], data['classes']] + data['attributes'])
 
 
 # Завершение разговора
