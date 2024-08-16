@@ -19,7 +19,7 @@ NAME, CLASSES, RACE, BACKGROUND = range(4)
 
 # Функция старта
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.message.reply_text("Приветствую тебя в таерне, Путник! Перед началом нового путешествия придется"
+    await update.message.reply_text("Приветствую тебя в таверне, Путник! Перед началом нового путешествия придется"
                                     "заполнить небольшую анкету. Так-с... Как тебя зовут?")
     return NAME
 
@@ -27,8 +27,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 # Получаем имя
 async def get_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['name'] = update.message.text
-    await update.message.reply_text("Приятно познакомиться, " + update.message.text + "! Теперь выбери класс своего "
-                                                                                      "персонажа!")
+    await update.message.reply_text("Приятно познакомиться, " + update.message.text + "!")
     await show_class_menu(update)
     return CLASSES
 
