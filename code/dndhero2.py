@@ -1,31 +1,23 @@
-# Импортируем библиотеки
 import csv
 import logging
-import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ConversationHandler, ContextTypes, \
-    CallbackQueryHandler, CallbackContext
-from datetime import datetime
-import venv
+    CallbackQueryHandler
 import os
-from flask import Flask, send_file
 
-# Включаем логирование
+
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Определяем этапы разговора
+
 NAME, CLASSES, RACE, BACKGROUND = range(4)
 
 
-# Функция старта
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text("Приветствую тебя в таверне, Путник! Перед началом нового путешествия придется"
                                     "заполнить небольшую анкету. Так-с... Как тебя зовут?")
     return NAME
 
-
-# Получаем имя
 async def get_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['name'] = update.message.text
     await update.message.reply_text("Приятно познакомиться, " + update.message.text + "!")
@@ -33,7 +25,6 @@ async def get_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return CLASSES
 
 
-# Показываем меню выбора класса
 async def show_class_menu(update: Update) -> None:
     keyboard = [
         [InlineKeyboardButton("'Бард' Сила: 8 Ловкость: 14 Телосложение: 12 Интеллект: 13 Мудрость: 10 Харизма: 15",
@@ -60,8 +51,6 @@ async def show_class_menu(update: Update) -> None:
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Выберите класс своего персонажа:", reply_markup=reply_markup)
 
-
-# Обработка выбора класса
 async def get_class(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
@@ -74,8 +63,6 @@ async def get_class(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await show_race_menu(query)
     return RACE
 
-
-# Отображаем меню выбора расы
 async def show_race_menu(query) -> None:
     keyboard = [
         [InlineKeyboardButton("'Человек' все характеристики +1", callback_data='human, 1, 1, 1, 1, 1, 1')],
@@ -92,8 +79,6 @@ async def show_race_menu(query) -> None:
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.message.reply_text("Выберите расу вашего персонажа:", reply_markup=reply_markup)
 
-
-# Обработка выбора расы
 async def choose_race(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
@@ -101,11 +86,8 @@ async def choose_race(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     context.user_data['race'] = selected_race[0]
     race_attributes = list(map(int, selected_race[1:]))
     global final_attributes
-    # Сохраняем итоговые характеристики
     final_attributes = [class_attr + race_attr for class_attr, race_attr in
                         zip(context.user_data['class_attributes'], race_attributes)]
-
-    # Сохраняем данные в CSV
 
     await query.message.reply_text(f"А теперь поведаешь ли мне, чем ты занимался до того, "
                                    f"как забрёл в мою таверну?")
@@ -115,22 +97,10 @@ async def choose_race(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 async def get_background(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['background'] = update.message.text
 
-    # Извлекаем необходимые данные
     name = context.user_data.get('name')
-    race = context.user_data.get('race')
-    character_class = context.user_data.get('character_class')
-    attributes = context.user_data.get('attributes', [])
-
-    # print(
-    #     f"Before saving: name={name}, race={race}, character_class={character_class}, attributes={attributes}")  # Отладочная информация
-
     filename = f"{name}_character_data.csv"
     save_character_to_csv(context.user_data['name'], context.user_data['race'], context.user_data['class'],
                           final_attributes, filename)
-    # Сохраняем данные в CSV файл
-    # save_character_to_csv(name, race, character_class, attributes, filename)
-
-    # Отправляем файл пользователю
     with open(filename, 'rb') as file:
         await update.message.reply_document(document=file)
 
@@ -139,17 +109,12 @@ async def get_background(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     return -1
 
 
-# Получаем историю и сохраняем данные
 def save_character_to_csv(name, race, character_class, attributes, filename='characters.csv'):
-    """Сохраняет данные о персонаже в CSV файл."""
-    print(f"Saving character: {name}, {race}, {character_class}, {attributes}")  # Отладочная информация
+    print(f"Saving character: {name}, {race}, {character_class}, {attributes}")
     with open(filename, mode='a', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
-        # Записываем данные персонажа
         writer.writerow([name, race, character_class] + attributes)
 
-
-# Завершение разговора
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text("Диалог отменен. Если хотите начать заново, введите /start.")
     return ConversationHandler.END
@@ -158,7 +123,6 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 def main():
     application = ApplicationBuilder().token('7247548199:AAHTI1v9Dlt3gylhoc3hr9LrH5H2QxgZGCQ').build()
 
-    # Создайте обработчик разговора
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
@@ -172,7 +136,6 @@ def main():
 
     application.add_handler(conv_handler)
 
-    # Запустите бота
     application.run_polling()
 
 
