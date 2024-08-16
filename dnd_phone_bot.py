@@ -127,7 +127,7 @@ async def show_order(update: Update, context: ContextTypes.DEFAULT_TYPE): #по�
 async def ask_gpt(prompt):  #запрос в гпт
     headers = {
         #апи ключ и формат в котором приходит ответ
-        'Authorization': f'Bearer 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',
+        'Authorization': f'Bearer sk-EEbaLASG4MCcyhXgkHFkfUSwt96qN2QWMybGbyDxHbT3BlbkFJv6XUPYAFTmmemvc3qYxXZTB08a32ItgLERPbhyWeEA',
         'Content-Type': 'application/json',
     }
 
@@ -163,7 +163,7 @@ def text_to_speech(text):  #озвучка текста от гпт но нем�
 
 async def generate_image(prompt):  #генерим пикчи по тексту от гпт
     headers = {
-        'Authorization': f'Bearer "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',
+        'Authorization': f'Bearer "sk-EEbaLASG4MCcyhXgkHFkfUSwt96qN2QWMybGbyDxHbT3BlbkFJv6XUPYAFTmmemvc3qYxXZTB08a32ItgLERPbhyWeEA',
         'Content-Type': 'application/json',
     }
 
