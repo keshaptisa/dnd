@@ -1,5 +1,7 @@
 import logging
 import csv
+import base64
+import httpx
 import requests
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, CallbackContext
 import random
@@ -8,6 +10,11 @@ from telegram.ext import ContextTypes
 import json
 import aiohttp
 from gtts import gTTS
+import wave
+import json
+from pydub import AudioSegment
+from vosk import Model, KaldiRecognizer
+import os
 
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -131,7 +138,6 @@ async def ask_gpt(prompt):  #запрос в гпт
     data = {
         'model': 'gpt-4o-mini',
         'messages': [{'role': 'user', 'content': prompt}],
-        'max_tokens': 500,  # Ограничение на количество токенов
     }
 
     async with aiohttp.ClientSession() as session:
@@ -144,18 +150,17 @@ async def ask_gpt(prompt):  #запрос в гпт
 
 
 def text_to_speech(text):
-    headers = {
-        'Authorization': 'Bearer sk-bWmuWR5oDsaP0ARLht6Z6MyhVqE9uDnxYJES3l24cyT3BlbkFJwymfBLJ-a0F3dfLHcoPGtpAQ_N_-1pIGBr3flwq4EA',
-        'Content-Type': 'application/json',
-    }
+    api_token = "a7c82240-4bff-4aad-917b-010e753d5e28"
+    url = f"https://public.api.voice.steos.io/api/v1/synthesize-controller/synthesis-by-text?authToken={api_token}"
 
-    data = {
-        "model": "tts-1",
-        "input": "The quick brown fox jumped over the lazy dog.",
-        "voice": "olyx"
-    }
-    tts = gTTS(text=text, lang='ru')
-    tts.save("output.mp3")
+    body = {"voiceId": 1, "text": text, "pitchShift": 1.2, "speedMultiplier": 0.5, "format": "mp3"}
+
+    response = httpx.post(url, json=body)
+    answer = response.json()
+    decoded_bytes = base64.b64decode(answer["fileContents"])
+
+    with open("./output.mp3", "wb") as fout:
+        fout.write(decoded_bytes)
     return "output.mp3"
 
 
@@ -208,6 +213,14 @@ async def start_game(update: Update, context: CallbackContext):
         await update.message.reply_text(image_url)  # Отправляем сообщение об ошибке
     else:
         await update.message.reply_photo(photo=image_url)
+
+    # Отправка музыки после картинки
+    if context.user_data['message_format'] == 'text':
+        await update.message.reply_text("Теперь музыка!")
+    else:
+        audio_file_path = text_to_speech("Теперь музыка!")
+        await context.bot.send_audio(chat_id=update.effective_chat.id, audio=open(audio_file_path, 'rb'))
+
     await update.message.reply_text("Игра началась! Введите ваши действия после команды /action.\nНапример так: '/action взять стакан'")
 
 
@@ -224,42 +237,147 @@ class Character:
         }
 
 
-async def roll_d20():  #кубик
+async def roll_d20():  # кубик
     return random.randint(1, 20)
 
 
 async def perform_action(action: str, update: Update):
-    character = playa[current_player_index] # Отправляем сообщение об ошибке
+    character = playa[current_player_index]  # Отправляем сообщение об ошибке
     attribute = random.choice(list(character.attributes.keys()))
     threshold = random.randint(1, 20)
-    await update.message.reply_text(f"{character.name}, для проведения вашего действия необхолимо подтвердить {attribute} {threshold}. Бросьте кубик /roll!")
-    roll = roll_d20()
+
+    await update.message.reply_text(
+        f"{character.name}, для проведения вашего действия необходимо подтвердить {attribute} {threshold}. Вы бросаете кубик!")
+# как переделать эту хуйею
+    roll = await roll_d20()  # Используем await для получения результата броска
     success = roll + character.attributes[attribute] >= threshold
-    await update.message.reply_text(f"Результат броска: {roll}. Результат проверки: {(roll + character.attributes[attribute])}")
-    prompt = f"{character.name} выполняет действие: '{action}'. Результат броска: {roll}. " \
-             f"Необходимая характеристика: {attribute}, Порог: {threshold}. " \
-             f"Успех: {'да' if success else 'нет'}. Опиши, что происходит дальше."
+
+    await update.message.reply_text(
+        f"Результат броска: {roll}. Результат проверки: {(roll + character.attributes[attribute])}")
+
+    prompt = (f"{character.name} выполняет действие: '{action}'. Результат броска: {roll}. "
+              f"Необходимая характеристика: {attribute}, Порог: {threshold}. "
+              f"Успех: {'да' if success else 'нет'}. Опиши, что происходит дальше.")
 
     gpt_response = await ask_gpt(prompt)
     await update.message.reply_text(gpt_response)
+    image_prompt = gpt_response  # Используем текст истории как подсказку для изображения
+    image_url = await generate_image(image_prompt)
+
+    # Отправка изображения пользователю
+    if image_url.startswith("Ошибка"):
+        await update.message.reply_text(image_url)  # Отправляем сообщение об ошибке
+    else:
+        await update.message.reply_photo(photo=image_url)
 
 
+def generate_music(prompt):
+    url = "https://api.suno.ai/generate/music"  # URL API SunoAI для генерации музыки
+    headers = {
+        "Authorization": "Bearer YOUR_API_KEY",  # Замените на ваш API ключ
+        "Content-Type": "application/json"
+    }
+    data = {
+        "prompt": prompt,
+        "duration": 30,  # Длительность в секундах
+        "genre": "classical"  # Укажите жанр, если это поддерживается
+    }
+
+    response = requests.post(url, headers=headers, json=data)
+
+    if response.status_code == 200:
+        music_url = response.json().get("music_url")
+        print(f"Сгенерированная музыка доступна по ссылке: {music_url}")
+    else:
+        print(f"Ошибка: {response.status_code} - {response.text}")
 async def action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global current_player_index
     await show_order(update, context)
-    action_text = ' '.join(context.args) if context.args else "действие"
 
-    await perform_action(action_text, update)
+    # Проверяем, есть ли аргументы
+    if context.args:
+        action_text = ' '.join(context.args)
 
-    current_player_index += 1
+        # Проверяем, является ли последний аргумент аудиофайлом
+        if action_text.lower().endswith(('.mp3', '.wav', '.flac')):
+            audio_file_path = action_text
+            model_path = "vosk-model-small-ru-0.22"  # Укажите путь к вашей модели
 
-    if current_player_index >= len(sorted_players):
-        current_player_index = 0
-        await continue_story(update)
+            try:
+                # Обработка аудиофайла
+                text = transcribe_audio_to_text(audio_file_path, model_path)
+                await perform_action(text, update)
+                current_player_index += 1
+
+                if current_player_index >= len(sorted_players):
+                    current_player_index = 0
+                    await continue_story(update)
+                else:
+                    next_character = playa[current_player_index]
+                    await update.message.reply_text(f"Теперь ход {next_character.name}. Введите ваше действие:")
+            except Exception as e:
+                await update.message.reply_text(f"Ошибка при обработке аудио: {e}")
+        else:
+            # Если это текст, передаем его в perform_action
+            await perform_action(action_text, update)
+            current_player_index += 1
+
+            if current_player_index >= len(sorted_players):
+                current_player_index = 0
+                await continue_story(update)
+            else:
+                next_character = playa[current_player_index]
+                await update.message.reply_text(f"Теперь ход {next_character.name}. Введите ваше действие:")
     else:
-        next_character = playa[current_player_index]
-        await update.message.reply_text(f"Теперь ход {next_character.name}. Введите ваше действие:")
+        await perform_action("действие", update)  # Если нет аргументов, выполняем действие по умолчанию
 
+
+def convert_to_wav(audio_file_path):
+    # Конвертация аудиофайла в формат WAV
+    audio = AudioSegment.from_file(audio_file_path)
+    wav_file_path = "converted_audio.wav"
+    audio.export(wav_file_path, format="wav")
+    return wav_file_path
+
+
+def transcribe_audio_to_text(audio_file_path, model_path):
+    # Проверка существования модели
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Model not found at {model_path}")
+
+    # Проверка существования аудиофайла
+    if not os.path.exists(audio_file_path):
+        raise FileNotFoundError(f"Audio file not found at {audio_file_path}")
+
+    # Конвертация аудиофайла в WAV
+    wav_file_path = convert_to_wav(audio_file_path)
+
+    # Загрузка модели
+    model = Model(model_path)
+    recognizer = KaldiRecognizer(model, 16000)
+
+    # Открытие WAV-файла
+    with wave.open(wav_file_path, "rb") as wf:
+        if wf.getnchannels() != 1 or wf.getsampwidth() != 2 or wf.getframerate() != 16000:
+            raise ValueError("Audio file must be WAV format mono PCM.")
+
+        # Чтение аудиоданных и распознавание речи
+        transcript = ""
+        while True:
+            data = wf.readframes(4000)
+            if len(data) == 0:
+                break
+            if recognizer.AcceptWaveform(data):
+                result = recognizer.Result()
+                transcript += json.loads(result)["text"] + " "
+            else:
+                recognizer.PartialResult()
+
+        # Получение окончательного результата
+        final_result = recognizer.FinalResult()
+        transcript += json.loads(final_result)["text"]
+
+    return transcript.strip()
 
 async def continue_story(update: Update):
     prompt = "Продолжи историю и подведи игроков к появлению врага."
