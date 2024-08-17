@@ -84,6 +84,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             c = Character(player_name, row[3], row[4], row[5], row[6], row[7], row[8])
             await update.message.reply_text(player_name)
             player_rolls[player_name] = 0
+            break
     playa.append(c)
     await update.message.reply_text("Данные успешно загружены! Используйте /roll для броска кубика.")
 
