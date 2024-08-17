@@ -84,7 +84,6 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             c = Character(player_name, row[3], row[4], row[5], row[6], row[7], row[8])
             await update.message.reply_text(player_name)
             player_rolls[player_name] = 0
-            break
     playa.append(c)
     await update.message.reply_text("Данные успешно загружены! Используйте /roll для броска кубика.")
 
@@ -125,13 +124,14 @@ async def show_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def ask_gpt(prompt):  #запрос в гпт
     headers = {
-        'Authorization': f'Bearer sk-M6nTKyYUrj_wB7u8VCZMAb4kP6ErJ0s8sxlh9Iu4xQT3BlbkFJ-MHp0LwkJT11Fbfteppyy2B3lRX4x9NfMD20bjT-cA',
+        'Authorization': f'Bearer sk-bWmuWR5oDsaP0ARLht6Z6MyhVqE9uDnxYJES3l24cyT3BlbkFJwymfBLJ-a0F3dfLHcoPGtpAQ_N_-1pIGBr3flwq4EA',
         'Content-Type': 'application/json',
     }
 
     data = {
         'model': 'gpt-4o-mini',
         'messages': [{'role': 'user', 'content': prompt}],
+        'max_tokens': 500,  # Ограничение на количество токенов
     }
 
     async with aiohttp.ClientSession() as session:
@@ -144,18 +144,29 @@ async def ask_gpt(prompt):  #запрос в гпт
 
 
 def text_to_speech(text):
+    headers = {
+        'Authorization': 'Bearer sk-bWmuWR5oDsaP0ARLht6Z6MyhVqE9uDnxYJES3l24cyT3BlbkFJwymfBLJ-a0F3dfLHcoPGtpAQ_N_-1pIGBr3flwq4EA',
+        'Content-Type': 'application/json',
+    }
+
+    data = {
+        "model": "tts-1",
+        "input": "The quick brown fox jumped over the lazy dog.",
+        "voice": "olyx"
+    }
     tts = gTTS(text=text, lang='ru')
     tts.save("output.mp3")
     return "output.mp3"
 
 
-async def generate_image(prompt):  #генерим пикчи по тексту от гпт
+async def generate_image(prompt):  # Генерируем изображения по тексту от GPT
     headers = {
-        'Authorization': f'Bearer "sk-M6nTKyYUrj_wB7u8VCZMAb4kP6ErJ0s8sxlh9Iu4xQT3BlbkFJ-MHp0LwkJT11Fbfteppyy2B3lRX4x9NfMD20bjT-cA',
+        'Authorization': 'Bearer sk-bWmuWR5oDsaP0ARLht6Z6MyhVqE9uDnxYJES3l24cyT3BlbkFJwymfBLJ-a0F3dfLHcoPGtpAQ_N_-1pIGBr3flwq4EA',
         'Content-Type': 'application/json',
     }
 
     data = {
+        'model': "dall-e-3",
         'prompt': prompt,
         'n': 1,
         'size': '1024x1024'
@@ -168,20 +179,35 @@ async def generate_image(prompt):  #генерим пикчи по тексту 
                 image_url = response_data['data'][0]['url']
                 return image_url
             else:
-                return f"Ошибка: {response.status}, {await response.text()}"
+                error_message = await response.text()
+                return f"Ошибка: {response.status}, {error_message}"
+
 
 async def start_game(update: Update, context: CallbackContext):
     prompt = "Создай начало истории для Dungeons & Dragons. Опиши где находятся герои и что вокруг них"
     story_start = await ask_gpt(prompt)
+
     global sorted_players, current_player_index
     current_player_index = 0
+
     with open(STORY_FILE, 'w') as f:
         json.dump({"story": story_start}, f)
+
     if context.user_data['message_format'] == 'text':
         await update.message.reply_text(story_start)
     else:
         audio_file_path = text_to_speech(story_start)
         await context.bot.send_audio(chat_id=update.effective_chat.id, audio=open(audio_file_path, 'rb'))
+
+    # Генерация изображения
+    image_prompt = story_start  # Используем текст истории как подсказку для изображения
+    image_url = await generate_image(image_prompt)
+
+    # Отправка изображения пользователю
+    if image_url.startswith("Ошибка"):
+        await update.message.reply_text(image_url)  # Отправляем сообщение об ошибке
+    else:
+        await update.message.reply_photo(photo=image_url)
     await update.message.reply_text("Игра началась! Введите ваши действия после команды /action.\nНапример так: '/action взять стакан'")
 
 
@@ -198,16 +224,18 @@ class Character:
         }
 
 
-def roll_d20():  #кубик
+async def roll_d20():  #кубик
     return random.randint(1, 20)
 
 
 async def perform_action(action: str, update: Update):
-    character = playa[current_player_index]
+    character = playa[current_player_index] # Отправляем сообщение об ошибке
     attribute = random.choice(list(character.attributes.keys()))
     threshold = random.randint(1, 20)
+    await update.message.reply_text(f"{character.name}, для проведения вашего действия необхолимо подтвердить {attribute} {threshold}. Бросьте кубик /roll!")
     roll = roll_d20()
     success = roll + character.attributes[attribute] >= threshold
+    await update.message.reply_text(f"Результат броска: {roll}. Результат проверки: {(roll + character.attributes[attribute])}")
     prompt = f"{character.name} выполняет действие: '{action}'. Результат броска: {roll}. " \
              f"Необходимая характеристика: {attribute}, Порог: {threshold}. " \
              f"Успех: {'да' if success else 'нет'}. Опиши, что происходит дальше."
