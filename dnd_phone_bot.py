@@ -214,14 +214,9 @@ async def start_game(update: Update, context: CallbackContext):
     else:
         await update.message.reply_photo(photo=image_url)
 
-    # Отправка музыки после картинки
-    if context.user_data['message_format'] == 'text':
-        await update.message.reply_text("Теперь музыка!")
-    else:
-        audio_file_path = text_to_speech("Теперь музыка!")
-        await context.bot.send_audio(chat_id=update.effective_chat.id, audio=open(audio_file_path, 'rb'))
 
-    await update.message.reply_text("Игра началась! Введите ваши действия после команды /action.\nНапример так: '/action взять стакан'")
+
+    await update.message.reply_text("Игра началась! Введите ваши действия после команды /action.\nНапример так: '/action' 'взять стакан'")
 
 
 class Character:
@@ -248,7 +243,7 @@ async def perform_action(action: str, update: Update):
 
     await update.message.reply_text(
         f"{character.name}, для проведения вашего действия необходимо подтвердить {attribute} {threshold}. Вы бросаете кубик!")
-# как переделать эту хуйею
+
     roll = await roll_d20()  # Используем await для получения результата броска
     success = roll + character.attributes[attribute] >= threshold
 
@@ -290,46 +285,50 @@ def generate_music(prompt):
         print(f"Сгенерированная музыка доступна по ссылке: {music_url}")
     else:
         print(f"Ошибка: {response.status_code} - {response.text}")
+WAITING_FOR_ACTION = range(1)
+
 async def action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global current_player_index
     await show_order(update, context)
 
-    # Проверяем, есть ли аргументы
-    if context.args:
-        action_text = ' '.join(context.args)
+    # Устанавливаем состояние ожидания действия
+    context.user_data['waiting_for_action'] = True
+    await update.message.reply_text("Введите ваше действие (текстом или голосом):")
 
-        # Проверяем, является ли последний аргумент аудиофайлом
-        if action_text.lower().endswith(('.mp3', '.wav', '.flac')):
-            audio_file_path = action_text
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global current_player_index
+
+    # Проверяем, ожидаем ли мы действие от игрока
+    if context.user_data.get('waiting_for_action'):
+        action_text = update.message.text
+
+        # Проверяем, является ли сообщение голосовым
+        if update.message.voice:
+            audio_file_path = await context.bot.get_file(update.message.voice.file_id).download()
             model_path = "vosk-model-small-ru-0.22"  # Укажите путь к вашей модели
 
             try:
                 # Обработка аудиофайла
                 text = transcribe_audio_to_text(audio_file_path, model_path)
                 await perform_action(text, update)
-                current_player_index += 1
-
-                if current_player_index >= len(sorted_players):
-                    current_player_index = 0
-                    await continue_story(update)
-                else:
-                    next_character = playa[current_player_index]
-                    await update.message.reply_text(f"Теперь ход {next_character.name}. Введите ваше действие:")
             except Exception as e:
                 await update.message.reply_text(f"Ошибка при обработке аудио: {e}")
         else:
             # Если это текст, передаем его в perform_action
             await perform_action(action_text, update)
-            current_player_index += 1
 
-            if current_player_index >= len(sorted_players):
-                current_player_index = 0
-                await continue_story(update)
-            else:
-                next_character = playa[current_player_index]
-                await update.message.reply_text(f"Теперь ход {next_character.name}. Введите ваше действие:")
+        # Сброс состояния ожидания
+        context.user_data['waiting_for_action'] = False
+        current_player_index += 1
+
+        if current_player_index >= len(sorted_players):
+            current_player_index = 0
+            await continue_story(update)
+        else:
+            next_character = playa[current_player_index]
+            await update.message.reply_text(f"Теперь ход {next_character.name}. Введите ваше действие:")
     else:
-        await perform_action("действие", update)  # Если нет аргументов, выполняем действие по умолчанию
+        await update.message.reply_text("Пожалуйста, сначала используйте команду /action.")
 
 
 def convert_to_wav(audio_file_path):
