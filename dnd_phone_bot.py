@@ -131,7 +131,7 @@ async def show_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def ask_gpt(prompt):  #запрос в гпт
     headers = {
-        'Authorization': f'Bearer sk-bWmuWR5oDsaP0ARLht6Z6MyhVqE9uDnxYJES3l24cyT3BlbkFJwymfBLJ-a0F3dfLHcoPGtpAQ_N_-1pIGBr3flwq4EA',
+        'Authorization': f'Bearer API!!!!!',
         'Content-Type': 'application/json',
     }
 
@@ -150,7 +150,7 @@ async def ask_gpt(prompt):  #запрос в гпт
 
 
 def text_to_speech(text):
-    api_token = "a7c82240-4bff-4aad-917b-010e753d5e28"
+    api_token = "API!!!!"
     url = f"https://public.api.voice.steos.io/api/v1/synthesize-controller/synthesis-by-text?authToken={api_token}"
 
     body = {"voiceId": 1, "text": text, "pitchShift": 1.2, "speedMultiplier": 0.5, "format": "mp3"}
@@ -166,7 +166,7 @@ def text_to_speech(text):
 
 async def generate_image(prompt):  # Генерируем изображения по тексту от GPT
     headers = {
-        'Authorization': 'Bearer sk-bWmuWR5oDsaP0ARLht6Z6MyhVqE9uDnxYJES3l24cyT3BlbkFJwymfBLJ-a0F3dfLHcoPGtpAQ_N_-1pIGBr3flwq4EA',
+        'Authorization': 'Bearer API!!!!!!!!!!!',
         'Content-Type': 'application/json',
     }
 
@@ -269,13 +269,13 @@ async def perform_action(action: str, update: Update):
 def generate_music(prompt):
     url = "https://api.suno.ai/generate/music"  # URL API SunoAI для генерации музыки
     headers = {
-        "Authorization": "Bearer YOUR_API_KEY",  # Замените на ваш API ключ
+        "Authorization": "Bearer API!!!", 
         "Content-Type": "application/json"
     }
     data = {
         "prompt": prompt,
         "duration": 30,  # Длительность в секундах
-        "genre": "classical"  # Укажите жанр, если это поддерживается
+        "genre": "classical"  
     }
 
     response = requests.post(url, headers=headers, json=data)
@@ -388,7 +388,7 @@ async def continue_story(update: Update):
 
 
 def main():
-    app = ApplicationBuilder().token("7243764957:AAG9YeIH9nKtxPUJR9oWOceyCV7RVShd5CU").build()
+    app = ApplicationBuilder().token("TOKEN!!!").build()
 
     app.add_handler(CommandHandler("start", start_bot))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message_format))
