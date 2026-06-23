@@ -1,0 +1,17 @@
+.idea/
+venv/
+__pycache__/
+*.py[cod]
+
+.env
+output.mp3
+converted_audio.wav
+
+vosk-model-small-ru-0.22/
+*.m4a
+*.mp3
+
+ллоэ.py
+руздг.py
+KOO.py
+dnd2.py
